@@ -75,29 +75,19 @@ var Controller = (function () {
     var xLine2 = pick(container, 'path4532-0');
     if (xLine2) { xLine2.style.fill = SYM_COLORS.cross; xLine2.style.stroke = SYM_COLORS.cross; }
 
-    // D-pad: the artwork's cross is a hole in a dark disc. Paint the disc white and
-    // drop its outline, then lay a clean dark-grey cross over it so the *buttons* are
-    // grey on a white background. Keep the arrow glyphs white on top.
+    // D-pad: colour the four directional button faces (the pads you press) dark.
+    // The disc (path4166-3) stays white so only the dark pads read, like the real pad.
+    ['rect4086', 'rect4086-1', 'rect4086-6', 'rect4086-17'].forEach(function (id) {
+      var face = pick(container, id);
+      if (face) { face.style.fill = '#26272b'; face.style.stroke = 'none'; }
+    });
     var dpadDisc = pick(container, 'path4166-3');
-    if (dpadDisc) {
-      dpadDisc.style.stroke = 'none';
-      var arm = function (x, y, w, h) {
-        var r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        r.setAttribute('x', x); r.setAttribute('y', y);
-        r.setAttribute('width', w); r.setAttribute('height', h);
-        r.setAttribute('rx', 10); r.setAttribute('fill', '#26272b');
-        return r;
-      };
-      var vert = arm(113, 68, 34, 114);
-      var horz = arm(72, 108, 116, 34);
-      dpadDisc.parentNode.insertBefore(vert, dpadDisc.nextSibling);
-      dpadDisc.parentNode.insertBefore(horz, vert.nextSibling);
-      // faint embossed arrows on the black cross (subtle, not white)
-      ['rect3996', 'rect3996-2', 'rect3996-3', 'rect3996-7'].forEach(function (aid) {
-        var a = pick(container, aid);
-        if (a) { a.style.fill = '#4a4b52'; a.style.stroke = 'none'; }
-      });
-    }
+    if (dpadDisc) dpadDisc.style.stroke = 'none';
+    // light arrows so the directions read on the dark pads
+    ['rect3996', 'rect3996-2', 'rect3996-3', 'rect3996-7'].forEach(function (aid) {
+      var a = pick(container, aid);
+      if (a) { a.style.fill = '#aeb2bc'; a.style.stroke = 'none'; }
+    });
 
     // PS button: white logo on a black circular button (add the black disc behind it).
     var psLogo = pick(container, 'path3840');
