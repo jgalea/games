@@ -1,0 +1,145 @@
+:root {
+  --bg: #14151c;
+  --bg2: #1d1f2b;
+  --fg: #f2f3f7;
+  --muted: #8b8fa3;
+  --accent: #ffd23f;
+  --win: #6bdc8a;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+#app { height: 100vh; width: 100vw; }
+
+.screen { display: none; height: 100%; }
+#app[data-screen="setup"]     .screen[data-screen="setup"],
+#app[data-screen="lobby"]     .screen[data-screen="lobby"],
+#app[data-screen="matchover"] .screen[data-screen="matchover"] {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+}
+#app[data-screen="game"] .screen[data-screen="game"] { display: flex; flex-direction: column; }
+
+/* mute */
+.mute {
+  position: fixed; top: 14px; right: 16px; z-index: 10;
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid #31344a; background: rgba(29,31,43,.7);
+  color: var(--fg); font-size: 20px; cursor: pointer;
+}
+.mute:hover { border-color: var(--accent); }
+
+/* ---- setup ---- */
+.logo { font-size: 64px; margin: 0; letter-spacing: -1px; }
+.tagline { color: var(--muted); margin: 0 0 8px; font-size: 18px; }
+.card {
+  background: var(--bg2); border-radius: 18px; padding: 28px 32px;
+  display: flex; flex-direction: column; gap: 16px; min-width: 320px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+}
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--muted); }
+.field input {
+  background: #11121a; border: 1px solid #31344a; color: var(--fg);
+  border-radius: 10px; padding: 12px 14px; font-size: 18px; outline: none;
+}
+.field input:focus { border-color: var(--accent); }
+.btn-primary {
+  background: var(--accent); color: #1a1a1a; border: none; border-radius: 10px;
+  padding: 14px 20px; font-size: 18px; font-weight: 700; cursor: pointer;
+}
+.btn-primary:hover { filter: brightness(1.05); }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent; color: var(--muted); border: 1px solid #31344a;
+  border-radius: 10px; padding: 12px 18px; font-size: 15px; cursor: pointer;
+}
+.btn-ghost:hover { color: var(--fg); }
+
+/* ---- lobby ---- */
+.lobby-title { font-size: 40px; margin: 0; }
+.lobby-hint { color: var(--muted); font-size: 17px; margin: 0; }
+.lobby-list { display: flex; flex-direction: column; gap: 10px; min-width: 360px; }
+.lobby-row {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg2); border-radius: 12px; padding: 10px 14px;
+}
+.lobby-row input {
+  flex: 1; background: #11121a; border: 1px solid #31344a; color: var(--fg);
+  border-radius: 8px; padding: 9px 12px; font-size: 17px; outline: none;
+}
+.lobby-row input:focus { border-color: var(--accent); }
+.pctrl { color: var(--muted); font-size: 13px; }
+.pdot { width: 16px; height: 16px; border-radius: 50%; flex: none; }
+.lobby-empty { color: var(--muted); font-size: 15px; margin: 0; }
+.lobby-actions { display: flex; gap: 12px; margin-top: 6px; }
+
+/* ---- game: scoreboard ---- */
+.scoreboard {
+  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+  padding: 14px 16px; border-bottom: 1px solid #23252f;
+}
+.chip {
+  display: flex; align-items: center; gap: 9px;
+  background: var(--bg2); border: 2px solid transparent;
+  border-radius: 999px; padding: 7px 14px; font-size: 18px;
+  transition: transform .15s, border-color .15s, background .15s;
+}
+.chip .cname { font-weight: 600; }
+.chip .cscore { font-weight: 800; color: var(--accent); min-width: 14px; text-align: center; }
+.chip.win { border-color: var(--pc); background: color-mix(in srgb, var(--pc) 22%, var(--bg2)); transform: scale(1.07); }
+
+/* ---- game: stage ---- */
+.stage { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 16px; }
+.play { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.controller-big { width: min(58vw, 560px); }
+.status { font-size: 34px; font-weight: 700; text-align: center; min-height: 42px; }
+.status.go { color: var(--accent); font-size: 46px; animation: pop .15s ease; }
+.status.count { color: var(--fg); font-size: 96px; line-height: 1; animation: pop .25s ease; }
+@keyframes pop { from { transform: scale(.6); } to { transform: scale(1); } }
+
+/* ---- game: reveal ---- */
+.reveal { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; animation: pop .2s ease; }
+.reveal-name { font-size: clamp(48px, 9vw, 120px); font-weight: 800; line-height: 1; }
+.reveal-ms { font-size: clamp(28px, 4vw, 52px); font-weight: 700; color: var(--accent); }
+
+/* ---- match over ---- */
+.trophy { font-size: 90px; }
+.winner-name { font-size: 52px; margin: 0; }
+.final-scores { display: flex; flex-direction: column; gap: 8px; min-width: 300px; }
+.fs-row { display: flex; align-items: center; gap: 12px; background: var(--bg2); border-radius: 10px; padding: 10px 16px; font-size: 20px; }
+.fs-name { flex: 1; }
+.fs-score { font-weight: 800; color: var(--accent); }
+.hint { color: var(--muted); font-size: 18px; margin: 4px 0 12px; }
+
+/* ---- controller artwork + button highlight ---- */
+.pad-wrap { position: relative; width: 100%; }
+.pad-svg { width: 100%; height: auto; display: block; transition: filter .12s; }
+.glows { position: absolute; inset: 0; pointer-events: none; }
+.glow {
+  position: absolute; width: 11%; aspect-ratio: 1; border-radius: 50%;
+  transform: translate(-50%, -50%) scale(.6);
+  background: radial-gradient(circle, #fff 0%, var(--glow) 55%, transparent 75%);
+  border: 2px solid rgba(255,255,255,.85);
+  opacity: 0;
+}
+.glow.flash {
+  opacity: 1;
+  box-shadow: 0 0 16px 4px var(--glow);
+  animation: glowpulse .5s ease-in-out infinite alternate;
+}
+@keyframes glowpulse {
+  from { transform: translate(-50%, -50%) scale(.92); }
+  to   { transform: translate(-50%, -50%) scale(1.12); }
+}
+/* dim the controller slightly while one button is lit so it pops */
+.pad-wrap:has(.glow.flash) .pad-svg { filter: brightness(.82); }

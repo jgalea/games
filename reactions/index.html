@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reactions</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button id="muteBtn" class="mute" title="Music on/off" aria-label="Music on/off">🔊</button>
+
+  <div id="app" data-screen="setup">
+
+    <!-- SETUP -->
+    <section class="screen" data-screen="setup">
+      <h1 class="logo">⚡ Reactions</h1>
+      <p class="tagline">One button lights up. First to press it wins.</p>
+      <div class="card">
+        <label class="field">
+          <span>Play to (points)</span>
+          <input id="target" type="number" min="1" max="20" value="5" inputmode="numeric">
+        </label>
+        <button id="toLobby" class="btn-primary">Next &rarr;</button>
+      </div>
+    </section>
+
+    <!-- LOBBY -->
+    <section class="screen" data-screen="lobby">
+      <h2 class="lobby-title">Who's playing?</h2>
+      <p class="lobby-hint">Press <strong>any button</strong> on a controller to join. Tap a name to edit it.</p>
+      <div class="lobby-list" id="lobbyList"></div>
+      <p class="lobby-empty" id="lobbyEmpty">Waiting for players&hellip;</p>
+      <div class="lobby-actions">
+        <button id="lobbyBack" class="btn-ghost">&larr; Back</button>
+        <button id="startGame" class="btn-primary" disabled>Start game</button>
+      </div>
+    </section>
+
+    <!-- GAME -->
+    <section class="screen" data-screen="game">
+      <div class="scoreboard" id="scoreboard"></div>
+      <div class="stage">
+        <div class="play" id="playView">
+          <div class="controller-big" id="ctrl"></div>
+          <div class="status" id="status">Get ready&hellip;</div>
+        </div>
+        <div class="reveal" id="revealView" hidden>
+          <div class="reveal-name" id="revealName">Player 1</div>
+          <div class="reveal-ms" id="revealMs">312 ms</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MATCH OVER -->
+    <section class="screen" data-screen="matchover">
+      <div class="trophy">🏆</div>
+      <h2 id="winnerName" class="winner-name">Player 1 wins!</h2>
+      <div class="final-scores" id="finalScores"></div>
+      <p class="hint">Press any button to play again</p>
+      <button id="newPlayers" class="btn-ghost">New players</button>
+    </section>
+
+  </div>
+
+  <script src="controller-svg.js"></script>
+  <script src="gamepad.js"></script>
+  <script src="controller.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

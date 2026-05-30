@@ -1,0 +1,94 @@
+:root {
+  --fg: #f2f7ff;
+  --muted: #9fb6d6;
+  --p1: #4ea1ff;
+  --p2: #ff7a59;
+  --circle: #ff5d7a;
+  --square: #c77dff;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #06121f;
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+#pool { display: block; width: 100vw; height: 100vh; }
+
+/* overlay (lane select; in-race UI is drawn on the canvas) */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 24px;
+  background: radial-gradient(circle at 50% 35%, rgba(10,40,70,.62), rgba(4,12,22,.93));
+  backdrop-filter: blur(2px);
+}
+.overlay.hidden { display: none; }
+
+.logo { font-size: clamp(38px, 7vw, 80px); margin: 0; letter-spacing: -1px; }
+.sub { color: var(--muted); margin: 0 0 6px; font-size: clamp(14px, 2.2vw, 19px); }
+.xkey {
+  display: inline-block; min-width: 26px; padding: 1px 7px;
+  border: 2px solid #5b8def; border-radius: 6px; color: #5b8def; font-weight: 700;
+}
+
+/* lane slots */
+.lanes { display: flex; gap: 26px; margin: 6px 0; flex-wrap: wrap; justify-content: center; }
+.lane-slot {
+  width: 280px; min-height: 170px;
+  border: 2px dashed #36507a; border-radius: 16px;
+  background: rgba(13,40,68,.55);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 20px;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+}
+#slotLeft  { --accent: var(--p1); }
+#slotRight { --accent: var(--p2); }
+.lane-slot.locked {
+  border-style: solid; border-color: var(--accent);
+  box-shadow: 0 0 26px color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, rgba(13,40,68,.55));
+}
+.lane-title { font-size: 28px; font-weight: 800; color: var(--accent); }
+.lane-sub { font-size: 15px; color: var(--muted); }
+.lane-tokens { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; min-height: 42px; margin-top: 6px; }
+
+.token {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 22px; font-weight: 700;
+  padding: 6px 12px; border-radius: 999px;
+  border: 2px solid var(--c); color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+}
+.token b { font-size: 15px; }
+.token.locked { background: var(--c); color: #06121f; }
+
+.status-line { color: var(--p1); font-size: 18px; margin: 8px 0 0; min-height: 22px; font-weight: 600; }
+.controls { color: var(--fg); font-size: 16px; margin: 4px 0 0; }
+.keys { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+.keycode { color: #5d7a9c; font-size: 12px; margin: 6px 0 0; font-family: ui-monospace, Menlo, monospace; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid currentColor; font-weight: 700; vertical-align: middle; margin: 0 1px;
+}
+.btn.circle { color: var(--circle); }
+.btn.square { color: var(--square); border-radius: 7px; }
+
+kbd {
+  background: #11283f; border: 1px solid #2c4a6b;
+  border-radius: 5px; padding: 1px 7px; font-family: inherit; font-size: 13px; color: var(--fg);
+}
