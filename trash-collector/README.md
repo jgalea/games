@@ -23,6 +23,11 @@ player presses Cross (✕) to ready up. A 3-2-1 countdown starts the race.
 Player 1 is the first connected controller (top panel), Player 2 the second
 (bottom panel).
 
+At the start screen, choose Keyboard or Gamepad (left/right, then Space/✕) and
+the next screen shows that scheme's controls for both players. Two players is the
+default — both must ready up to start. Press Escape (or Circle on a pad) during a
+race to pause: resume, restart the round, or quit to the main menu.
+
 ## How to win
 
 Drive into a dumpster's dashed parking bay, stop inside it, and hold ✕ until the

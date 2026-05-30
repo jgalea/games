@@ -25,7 +25,7 @@
   var BRAKE = 900;                      // px/s^2 slow down when no input
   var STOP_EPS = 16;                    // |velocity| below this counts as parked
   var LOAD_TIME = 1.2;                  // seconds to fill one dumpster
-  var PARK_TOL_X = 14, PARK_TOL_Y = 10; // how precisely the truck must sit in the bay
+  var PARK_TOL_X = 26, PARK_TOL_Y = 15; // anywhere inside the bay counts as parked
   var BAY_W = 54, BAY_H = 30;           // dashed parking bay size
   var DUMPSTER_COUNT = 5;
 
@@ -200,14 +200,19 @@
   var players = [makePlayer(0, roundWorld), makePlayer(1, roundWorld)];
 
   // ---- Game state ------------------------------------------------------------
-  var STATE = { TITLE: 'title', COUNTDOWN: 'countdown', RACE: 'race', WIN: 'win' };
-  var state = STATE.TITLE;
+  var STATE = { MENU: 'menu', TITLE: 'title', COUNTDOWN: 'countdown', RACE: 'race', PAUSE: 'pause', WIN: 'win' };
+  var state = STATE.MENU;
   var stateTime = 0;
   var countdownLeft = 0;
   var lastCountdownShown = -1;
   var winner = -1;
   var wins = [0, 0];
   var matchOver = false;
+  var scheme = 'gamepad';     // chosen control scheme: 'keyboard' | 'gamepad'
+  var menuSel = 1;            // 0 = keyboard, 1 = gamepad
+  var menuAxisPrev = 0;
+  var PAUSE_OPTS = ['RESUME', 'RESTART ROUND', 'MAIN MENU'];
+  var pauseSel = 0, pauseAxisPrev = 0;
 
   function startRound(keepReady) {
     roundWorld = makeWorld();
@@ -227,14 +232,59 @@
   // ---- Update ----------------------------------------------------------------
   function update(dt) {
     stateTime += dt;
-    if (state === STATE.TITLE) updateTitle();
+    if (state === STATE.MENU) updateMenu();
+    else if (state === STATE.TITLE) updateTitle();
     else if (state === STATE.COUNTDOWN) updateCountdown(dt);
     else if (state === STATE.RACE) updateRace(dt);
+    else if (state === STATE.PAUSE) updatePause();
     else if (state === STATE.WIN) updateWin();
     else Input.syncEdges();
   }
 
+  // Vertical menu navigation for the pause menu: returns -1, 0, or 1.
+  function menuVertical() {
+    var m0 = Input.move(0), m1 = Input.move(1), ay = 0;
+    if (Math.abs(m0.y) > 0.5) ay = m0.y > 0 ? 1 : -1;
+    else if (Math.abs(m1.y) > 0.5) ay = m1.y > 0 ? 1 : -1;
+    return ay;
+  }
+
+  function updatePause() {
+    if (Input.backPressed()) { setState(STATE.RACE); return; }   // Esc / Circle resumes
+    var ay = menuVertical();
+    if (ay !== 0 && pauseAxisPrev === 0) {
+      pauseSel = (pauseSel + ay + PAUSE_OPTS.length) % PAUSE_OPTS.length;
+      Audio2.tick();
+    }
+    pauseAxisPrev = ay;
+
+    if (Input.actionPressed(0) || Input.actionPressed(1)) {
+      if (pauseSel === 0) { setState(STATE.RACE); }
+      else if (pauseSel === 1) { startRound(true); setState(STATE.COUNTDOWN); }
+      else { wins = [0, 0]; matchOver = false; startRound(false); setState(STATE.MENU); }
+    }
+  }
+
+  function updateMenu() {
+    // Highlight moves on a fresh left/right from either player or the keyboard.
+    var m0 = Input.move(0), m1 = Input.move(1);
+    var ax = 0;
+    if (Math.abs(m0.x) > 0.5) ax = m0.x > 0 ? 1 : -1;
+    else if (Math.abs(m1.x) > 0.5) ax = m1.x > 0 ? 1 : -1;
+    if (ax !== 0 && menuAxisPrev === 0) { menuSel = ax > 0 ? 1 : 0; Audio2.resume(); Audio2.tick(); }
+    menuAxisPrev = ax;
+
+    if (Input.actionPressed(0) || Input.actionPressed(1)) {
+      Audio2.resume();
+      scheme = menuSel === 0 ? 'keyboard' : 'gamepad';
+      Audio2.countdown(1);
+      startRound(false);          // fresh, un-readied players for the new game
+      setState(STATE.TITLE);
+    }
+  }
+
   function updateTitle() {
+    if (Input.backPressed()) { setState(STATE.MENU); return; }
     for (var i = 0; i < 2; i++) {
       if (!players[i].ready && Input.actionPressed(i)) {
         Audio2.resume();
@@ -263,6 +313,9 @@
     // Note: do NOT call Input.syncEdges() here — it would clobber the throw
     // button's edge state before handleThrow reads it. setState() refreshes
     // edges on every state transition, which is all that's needed.
+
+    // Esc / Circle opens the pause menu.
+    if (Input.backPressed()) { pauseSel = 0; pauseAxisPrev = 0; setState(STATE.PAUSE); return; }
 
     // Determine who is leading for catch-up tuning.
     var leadIndex = progressMetric(players[0]) >= progressMetric(players[1]) ? 0 : 1;
@@ -340,6 +393,9 @@
     if (ny !== p.y) p.vy = 0;
     p.x = nx; p.y = ny;
 
+    // Dumpsters are solid: push the truck back out and you drive around them.
+    blockByDumpsters(p);
+
     // Ammo pickups.
     for (var b = 0; b < p.bags.length; b++) {
       var bag = p.bags[b];
@@ -380,6 +436,22 @@
         matchOver = wins[winner] >= WIN_TARGET;
         Audio2.win();
         setState(STATE.WIN);
+      }
+    }
+  }
+
+  // AABB push-out so the truck can't drive through a dumpster's body.
+  function blockByDumpsters(p) {
+    var thw = TRUCK_HALF_W - 3, thh = TRUCK_HALF_H - 1;
+    var dhw = 15, dhh = 13;
+    for (var i = 0; i < p.dumpsters.length; i++) {
+      var d = p.dumpsters[i];
+      var dx = p.x - d.x, dy = p.y - d.y;
+      var ox = (thw + dhw) - Math.abs(dx);
+      var oy = (thh + dhh) - Math.abs(dy);
+      if (ox > 0 && oy > 0) {
+        if (ox < oy) { p.x = d.x + (dx < 0 ? -1 : 1) * (thw + dhw); p.vx = 0; }
+        else { p.y = d.y + (dy < 0 ? -1 : 1) * (thh + dhh); p.vy = 0; }
       }
     }
   }
@@ -530,8 +602,10 @@
     ctx.fillStyle = '#000';
     ctx.fillRect(0, PANEL_H - 1, CANVAS_W, 2);
 
-    if (state === STATE.TITLE) drawTitle();
+    if (state === STATE.MENU) drawMenu();
+    else if (state === STATE.TITLE) drawTitle();
     else if (state === STATE.COUNTDOWN) drawCountdown();
+    else if (state === STATE.PAUSE) drawPause();
     else if (state === STATE.WIN) drawWin();
   }
 
@@ -569,7 +643,8 @@
     drawSkids(p);
     drawFinish(p);
     var bay = parkedAt(p);
-    p.dumpsters.forEach(function (d) { drawBay(d, d === bay && p.loading); });
+    var parkedReady = bay && Math.hypot(p.vx, p.vy) < STOP_EPS;
+    p.dumpsters.forEach(function (d) { drawBay(d, d === bay && parkedReady); });
     p.dumpsters.forEach(function (d) { drawDumpster(d, cam); });
     p.bags.forEach(function (b) { drawBag(b, cam); });
     p.hazards.forEach(drawHazard);
@@ -844,39 +919,83 @@
   // ---- Overlays --------------------------------------------------------------
   function setFont(px) { ctx.font = px + "px 'Press Start 2P', monospace"; }
 
-  function centerText(txt, y, px, color) {
+  function centerText(txt, y, px, color) { textAt(txt, CANVAS_W / 2, y, px, color, 'center'); }
+
+  function textAt(txt, x, y, px, color, align) {
     setFont(px);
-    ctx.textAlign = 'center';
+    ctx.textAlign = align || 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#000';
-    ctx.fillText(txt, CANVAS_W / 2 + 2, y + 2);
+    ctx.fillText(txt, x + 2, y + 2);
     ctx.fillStyle = color;
-    ctx.fillText(txt, CANVAS_W / 2, y);
+    ctx.fillText(txt, x, y);
     ctx.textAlign = 'left';
   }
 
-  function drawTitle() {
-    ctx.fillStyle = 'rgba(0,0,0,0.74)';
+  function drawMenu() {
+    ctx.fillStyle = '#0a0c14';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-    centerText('TRASH', 70, 28, COL.p1);
-    centerText('COLLECTOR', 106, 28, COL.p2);
-    centerText('Load all 5 bins to open the finish - best of 3', 144, 8, COL.hudText);
-    centerText('Grab bags for ammo - press R1 to lob a peel at your rival', 162, 8, '#8890a8');
+    centerText('TRASH', 46, 26, COL.p1);
+    centerText('COLLECTOR', 80, 26, COL.p2);
+    centerText('2-PLAYER   -   BEST OF 3', 108, 9, COL.hudText);
+
+    centerText('Load all 5 bins to open your finish, then race to it', 140, 8, '#c7ccda');
+    centerText('Dodge groundhogs and puddles - a hit spins you out', 156, 8, '#c7ccda');
+    centerText('Grab bags for ammo, throw a peel to spin your rival', 172, 8, '#c7ccda');
+
+    centerText('CHOOSE YOUR CONTROLS', 208, 9, COL.hudText);
+    var kx = CANVAS_W / 2 - 86, gx = CANVAS_W / 2 + 86, oy = 236;
+    textAt('KEYBOARD', kx, oy, 12, menuSel === 0 ? COL.open : '#5a6072');
+    textAt('GAMEPAD', gx, oy, 12, menuSel === 1 ? COL.open : '#5a6072');
+    var sx = menuSel === 0 ? kx : gx, sw = menuSel === 0 ? 80 : 70;
+    ctx.fillStyle = COL.open;
+    ctx.fillRect(sx - sw / 2, oy + 12, sw, 2);
+
+    centerText('left / right to choose      SPACE / X to start', 278, 8, '#8890a8');
+    centerText(Input.connectedCount() + ' gamepad(s) connected', 302, 8, '#8890a8');
+  }
+
+  function drawTitle() {
+    ctx.fillStyle = 'rgba(0,0,0,0.82)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    centerText('GET READY', 52, 20, COL.hudText);
+    centerText((scheme === 'keyboard' ? 'KEYBOARD' : 'GAMEPAD') + ' CONTROLS', 78, 9, '#8890a8');
+
+    if (scheme === 'keyboard') {
+      centerText('P1   move W A S D     load SPACE     throw E', 108, 8, COL.p1);
+      centerText('P2   move ARROWS      load ENTER     throw /', 126, 8, COL.p2);
+    } else {
+      centerText('one controller each  -  P1 = pad 1, P2 = pad 2', 106, 8, '#c7ccda');
+      centerText('move  LEFT STICK / D-PAD', 124, 8, COL.hudText);
+      centerText('load  X (hold)        throw  R1', 140, 8, COL.hudText);
+    }
 
     for (var i = 0; i < 2; i++) {
       var col = players[i].color;
       var ready = players[i].ready;
-      centerText(
-        'PLAYER ' + (i + 1) + ': ' + (ready ? 'READY!' : 'press X / ' + (i === 0 ? 'SPACE' : 'ENTER')),
-        198 + i * 26, 10, ready ? COL.open : col
-      );
+      var prompt = scheme === 'keyboard' ? (i === 0 ? 'SPACE' : 'ENTER') : 'X';
+      centerText('PLAYER ' + (i + 1) + ': ' + (ready ? 'READY!' : 'press ' + prompt),
+        178 + i * 24, 10, ready ? COL.open : col);
     }
-    centerText(Input.connectedCount() + ' controller(s) connected', 296, 8, '#8890a8');
+    centerText('Esc / O  to change controls', 276, 8, '#8890a8');
+    centerText(Input.connectedCount() + ' gamepad(s) connected', 300, 8, '#8890a8');
   }
 
   function drawCountdown() {
     var shown = Math.ceil(countdownLeft - 1);
     centerText(shown > 0 ? String(shown) : 'GO!', CANVAS_H / 2, 40, shown > 0 ? COL.hudText : COL.open);
+  }
+
+  function drawPause() {
+    ctx.fillStyle = 'rgba(0,0,0,0.78)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    centerText('PAUSED', 96, 26, COL.hudText);
+    for (var i = 0; i < PAUSE_OPTS.length; i++) {
+      var sel = i === pauseSel;
+      centerText((sel ? '> ' : '  ') + PAUSE_OPTS[i] + (sel ? ' <' : ''),
+        152 + i * 30, 12, sel ? COL.open : '#5a6072');
+    }
+    centerText('up / down to choose    SPACE / X to select    Esc resumes', 286, 8, '#8890a8');
   }
 
   function drawWin() {

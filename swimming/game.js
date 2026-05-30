@@ -30,6 +30,26 @@
   var SHARK_HIT_X = 22;
   var SHARK_HIT_Y = 22;
 
+  var STEER_SPEED = 0.85;       // top lateral speed (lane-fractions/sec) — gentle
+  var STEER_ACCEL = 3.2;        // how quickly the swimmer eases toward that speed (inertia)
+  var URCHIN_STUN_MS = 3000;    // caught on an urchin for 3..2..1 then back to start
+
+  // Static sea urchins scattered across the whole lane (x and y are fractions,
+  // 0..1). You weave between them. Same layout in both lanes so it stays fair.
+  var URCHINS = [
+    { x: 0.28, y: 0.16 },
+    { x: 0.68, y: 0.24 },
+    { x: 0.46, y: 0.33 },
+    { x: 0.16, y: 0.42 },
+    { x: 0.82, y: 0.47 },
+    { x: 0.52, y: 0.56 },
+    { x: 0.30, y: 0.65 },
+    { x: 0.72, y: 0.72 },
+    { x: 0.45, y: 0.83 }
+  ];
+  var URCHIN_HIT_X = 22;
+  var URCHIN_HIT_Y = 22;
+
   // PlayStation buttons (W3C Standard Gamepad mapping)
   var BTN_CROSS  = 0;   // lock in
   var BTN_CIRCLE = 1;   // right-hand stroke / unlock in select
@@ -84,6 +104,8 @@
       pos: 0,                 // 0 = start, 1 = finish wall
       vel: 0,
       lastHand: null,         // 'R' | 'L'
+      lx: 0,                  // lateral position in lane: -1 left edge .. +1 right edge
+      lvel: 0,                // lateral velocity (eased for natural, drifting turns)
       strokeTimes: [],        // performance.now() of recent strokes (for rate display)
       armStroke: { R: -9999, L: -9999 }, // time of last sweep per arm
       activeArm: null,
@@ -92,6 +114,7 @@
       wake: [],
       falseStart: false,
       frozenUntil: 0,
+      stunUntil: 0,           // caught on an urchin until this time (0 = free)
       eatenFlash: -9999,      // time of last shark hit (for the red flash)
       finished: false,
       finishTime: 0
@@ -222,10 +245,10 @@
   // whale at the same moment.
   function makeWhales() {
     whales = [];
-    var count = Math.random() < 0.5 ? 1 : 2;
+    var count = Math.random() < 0.5 ? 3 : 4;
     var prev = 0;
     for (var i = 0; i < count; i++) {
-      var offset = prev + 2500 + Math.random() * 6000;
+      var offset = prev + 1500 + Math.random() * 3000;
       prev = offset;
       var ltr = Math.random() < 0.5;
       var yS = 0.22 + Math.random() * 0.55;
@@ -253,6 +276,7 @@
     }
     if (state !== "racing" || p.finished) return;
     if (now < p.frozenUntil) return;                       // serving false-start penalty
+    if (now < p.stunUntil) return;                         // caught on an urchin
     if (p.lastHand !== null && hand === p.lastHand) return; // same hand -> wasted
 
     // clean alternating stroke
@@ -285,8 +309,9 @@
   };
   var keycodeEl = document.getElementById("keycode");
   window.addEventListener("keydown", function (e) {
+    if (keycodeEl && !e.repeat) keycodeEl.textContent = "last key: " + e.code + " (keyCode " + e.keyCode + ")";
+    if (LAT_KEYS[e.code]) { keysDown[e.code] = true; e.preventDefault(); return; }  // held steering
     if (e.repeat) return;
-    if (keycodeEl) keycodeEl.textContent = "last key: " + e.code + " (keyCode " + e.keyCode + ")";
     if (state === "select") {
       if (e.code === "Enter" || e.code === "Space") { startCountdown(); e.preventDefault(); }
       return;
@@ -300,6 +325,9 @@
     var m = KEYMAP[e.code];
     if (m) { handleStroke(m[0], m[1]); e.preventDefault(); }
   });
+  window.addEventListener("keyup", function (e) {
+    if (LAT_KEYS[e.code]) keysDown[e.code] = false;
+  });
 
   // ---- particles -------------------------------------------------------
   function laneGeom(i) {
@@ -311,9 +339,17 @@
     return { laneW: laneW, x0: x0, cx: cx, trackTop: trackTop,
              trackBottom: trackBottom, trackLen: trackBottom - trackTop };
   }
+  function maxOff(g) { return g.laneW / 2 - 42; }     // how far the swimmer can slide from center
+  function swimmerX(p, g) { return g.cx + p.lx * maxOff(g); }
   function swimmerXY(p) {
     var g = laneGeom(p.index);
-    return { x: g.cx, y: g.trackBottom - p.pos * g.trackLen, g: g };
+    return { x: swimmerX(p, g), y: g.trackBottom - p.pos * g.trackLen, g: g };
+  }
+  function urchinXY(u, g) {
+    return {
+      x: g.cx + (2 * u.x - 1) * maxOff(g),   // u.x 0..1 spans the swimmer's reachable width
+      y: g.trackBottom - u.y * g.trackLen
+    };
   }
   function sharkPos(shark, g, now) {
     var t = now / 1000;
@@ -363,28 +399,66 @@
 
   function hitsShark(p, now) {
     var g = laneGeom(p.index);
-    var sy = g.trackBottom - p.pos * g.trackLen;
+    var sx = swimmerX(p, g), sy = g.trackBottom - p.pos * g.trackLen;
     for (var i = 0; i < SHARKS.length; i++) {
       var s = sharkPos(SHARKS[i], g, now);
-      if (Math.abs(g.cx - s.x) < SHARK_HIT_X && Math.abs(sy - s.y) < SHARK_HIT_Y) return true;
+      if (Math.abs(sx - s.x) < SHARK_HIT_X && Math.abs(sy - s.y) < SHARK_HIT_Y) return true;
     }
     return false;
   }
   function hitsWhale(p, now) {
     var g = laneGeom(p.index);
-    var sy = g.trackBottom - p.pos * g.trackLen;
+    var sx = swimmerX(p, g), sy = g.trackBottom - p.pos * g.trackLen;
     for (var i = 0; i < whales.length; i++) {
       var w = whalePos(whales[i], g, now);
-      if (w && Math.abs(g.cx - w.x) < 36 && Math.abs(sy - w.y) < 24) return true;
+      if (w && Math.abs(sx - w.x) < 36 && Math.abs(sy - w.y) < 24) return true;
+    }
+    return false;
+  }
+  function hitsUrchin(p) {
+    var g = laneGeom(p.index);
+    var sx = swimmerX(p, g), sy = g.trackBottom - p.pos * g.trackLen;
+    for (var i = 0; i < URCHINS.length; i++) {
+      var u = urchinXY(URCHINS[i], g);
+      if (Math.abs(sx - u.x) < URCHIN_HIT_X && Math.abs(sy - u.y) < URCHIN_HIT_Y) return true;
     }
     return false;
   }
   function eatPlayer(p, now) {
     p.pos = 0;
     p.vel = 0;
+    p.lx = 0;
+    p.lvel = 0;
     p.lastHand = null;
     p.strokeTimes = [];
     p.eatenFlash = now;
+  }
+
+  // steering input: analog left stick for the lane's controller, plus held keys
+  function padForLane(lane) {
+    for (var gi in padLane) { if (padLane[gi] === lane) return parseInt(gi, 10); }
+    return -1;
+  }
+  function padAxisX(gi) {
+    var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    var p = pads[gi];
+    if (!p || !p.axes || !p.axes.length) return 0;
+    var x = p.axes[0];
+    return Math.abs(x) > 0.18 ? x : 0;   // deadzone
+  }
+  var keysDown = {};
+  var LAT_KEYS = { KeyA: [0, -1], KeyD: [0, 1], KeyK: [1, -1], KeyL: [1, 1] };
+  function keyboardSteer(lane) {
+    var s = 0;
+    for (var code in LAT_KEYS) {
+      if (keysDown[code] && LAT_KEYS[code][0] === lane) s += LAT_KEYS[code][1];
+    }
+    return s;
+  }
+  function steerInput(lane) {
+    var gi = padForLane(lane);
+    var stick = gi >= 0 ? padAxisX(gi) : 0;
+    return stick !== 0 ? stick : keyboardSteer(lane);
   }
 
   // ---- update ----------------------------------------------------------
@@ -401,16 +475,35 @@
       var pl = players[p];
 
       if (state === "racing" && !pl.finished) {
-        pl.vel -= pl.vel * DRAG * dt;
-        if (pl.vel < 0) pl.vel = 0;
-        pl.pos += pl.vel * dt;
-        if (pl.pos >= 1) {
-          pl.pos = 1;
-          pl.finished = true;
-          pl.finishTime = (now - goTime) / 1000;
-          if (winner === -1) { winner = pl.index; state = "finished"; }
-        } else if (pl.pos > 0.02 && (hitsShark(pl, now) || hitsWhale(pl, now))) {
-          eatPlayer(pl, now);
+        if (now < pl.stunUntil) {
+          pl.vel = 0;                 // caught on an urchin, frozen in place
+        } else {
+          if (pl.stunUntil !== 0) {   // stun just ended -> back to the start
+            pl.stunUntil = 0;
+            pl.pos = 0; pl.vel = 0; pl.lx = 0; pl.lvel = 0;
+            pl.lastHand = null; pl.strokeTimes = [];
+          }
+          // steer across the lane — ease toward the input so turns are gradual,
+          // and the swimmer keeps drifting (and moving diagonally) after you let go
+          pl.lvel += (steerInput(pl.index) - pl.lvel) * Math.min(1, dt * STEER_ACCEL);
+          pl.lx += pl.lvel * STEER_SPEED * dt;
+          if (pl.lx < -1) { pl.lx = -1; pl.lvel = 0; }
+          if (pl.lx > 1) { pl.lx = 1; pl.lvel = 0; }
+          // forward
+          pl.vel -= pl.vel * DRAG * dt;
+          if (pl.vel < 0) pl.vel = 0;
+          pl.pos += pl.vel * dt;
+          if (pl.pos >= 1) {
+            pl.pos = 1;
+            pl.finished = true;
+            pl.finishTime = (now - goTime) / 1000;
+            if (winner === -1) { winner = pl.index; state = "finished"; }
+          } else if (pl.pos > 0.02 && (hitsShark(pl, now) || hitsWhale(pl, now))) {
+            eatPlayer(pl, now);
+          } else if (pl.pos > 0.02 && hitsUrchin(pl)) {
+            pl.stunUntil = now + URCHIN_STUN_MS;   // 3..2..1 then back to start
+            pl.vel = 0;
+          }
         }
       }
 
@@ -485,12 +578,26 @@
     ctx.stroke();
 
     drawFinishWall(g);
+    drawUrchins(g);
     drawWake(p);
     drawSwimmer(p, now);
     drawSplashes(p);
     drawSharks(g, now);
     drawWhales(g, now);
     drawHud(i, g, p);
+
+    // 3-2-1 hold while caught on an urchin
+    if (now < p.stunUntil) {
+      var sxy = swimmerXY(p);
+      var n = Math.ceil((p.stunUntil - now) / 1000);
+      ctx.fillStyle = "#ffd23f";
+      ctx.font = "800 44px -apple-system, Segoe UI, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(String(n), sxy.x, sxy.y - 34);
+      ctx.fillStyle = "rgba(255,210,63,0.9)";
+      ctx.font = "700 14px -apple-system, Segoe UI, sans-serif";
+      ctx.fillText("ouch! urchin", sxy.x, sxy.y - 64);
+    }
 
     // red flash + label when a shark just ate this swimmer
     var since = now - p.eatenFlash;
@@ -719,6 +826,36 @@
       ctx.arc(29, -3, 2.8, 0, Math.PI * 2);
       ctx.fill();
 
+      ctx.restore();
+    }
+  }
+
+  function drawUrchins(g) {
+    for (var i = 0; i < URCHINS.length; i++) {
+      var u = urchinXY(URCHINS[i], g);
+      ctx.save();
+      ctx.translate(u.x, u.y);
+
+      // spikes
+      ctx.strokeStyle = "#2a2138";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      for (var k = 0; k < 12; k++) {
+        var a = (k / 12) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
+        ctx.lineTo(Math.cos(a) * 17, Math.sin(a) * 17);
+        ctx.stroke();
+      }
+      // body
+      ctx.fillStyle = "#3a2d52";
+      ctx.beginPath();
+      ctx.arc(0, 0, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#5a4488";
+      ctx.beginPath();
+      ctx.arc(-2, -2, 4, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
   }

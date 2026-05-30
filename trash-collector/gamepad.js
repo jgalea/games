@@ -82,6 +82,13 @@ var Input = (function () {
     return pad ? btn(pad, TOSS_BTN) : false;
   }
 
+  // "Back / cancel" from either source: Escape/Backspace or Circle on any pad.
+  function back() {
+    if (keys.Escape || keys.Backspace) return true;
+    for (var i = 0; i < 2; i++) { var p = padFor(i); if (p && btn(p, 1)) return true; }
+    return false;
+  }
+
   // Edge-triggered action for menus. Call at most once per player per frame.
   var prevAction = [false, false];
   function actionPressed(player) {
@@ -100,6 +107,14 @@ var Input = (function () {
     return fired;
   }
 
+  var prevBack = false;
+  function backPressed() {
+    var now = back();
+    var fired = now && !prevBack;
+    prevBack = now;
+    return fired;
+  }
+
   // Keep edge state fresh even when the pressed-helpers aren't polled (e.g. the
   // action button during the race), so returning to a menu doesn't misfire.
   function syncEdges() {
@@ -107,6 +122,7 @@ var Input = (function () {
     prevAction[1] = action(1);
     prevToss[0] = toss(0);
     prevToss[1] = toss(1);
+    prevBack = back();
   }
 
   function connectedCount() { return connectedPads().length; }
@@ -117,6 +133,7 @@ var Input = (function () {
     actionPressed: actionPressed,
     toss: toss,
     tossPressed: tossPressed,
+    backPressed: backPressed,
     syncEdges: syncEdges,
     padFor: padFor,
     connectedCount: connectedCount
