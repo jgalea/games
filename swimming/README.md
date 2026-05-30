@@ -25,9 +25,10 @@ Use the left stick to steer your swimmer left and right within the lane.
 Sharks patrol the lane, sweeping side to side. Bump one and it eats you back
 to the start, so steer around them or time your strokes to slip past. Once or
 twice a race a bigger, slower whale crosses diagonally, same deal if you hit it.
-Sea urchins are scattered across the whole lane; clip one and you're stuck for
-a 3-2-1 count before being sent back to the start. Every hazard is identical in
-both lanes, so the race stays fair.
+Sea urchins are scattered across the whole lane, edge to edge, so hugging a
+wall is no shortcut. Clip one and you're stuck for a 3-2-1 count, then you slip
+to the side of it and carry on from where you are (no trip back to the start).
+Every hazard is identical in both lanes, so the race stays fair.
 
 After a 3-2-1-GO countdown, the first swimmer to touch the finish wall wins.
 Jump the gun and you get a one-second false-start freeze.

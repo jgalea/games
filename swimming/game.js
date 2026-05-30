@@ -34,18 +34,25 @@
   var STEER_ACCEL = 3.2;        // how quickly the swimmer eases toward that speed (inertia)
   var URCHIN_STUN_MS = 3000;    // caught on an urchin for 3..2..1 then back to start
 
-  // Static sea urchins scattered across the whole lane (x and y are fractions,
-  // 0..1). You weave between them. Same layout in both lanes so it stays fair.
+  // Static sea urchins scattered across the whole lane, x and y as fractions
+  // (0..1) of the swimmer's reachable area, so the edges hold urchins too and
+  // hugging a wall is no free ride. One per height with gaps, so it's weavable.
+  // Same layout in both lanes so it stays fair.
   var URCHINS = [
-    { x: 0.28, y: 0.16 },
-    { x: 0.68, y: 0.24 },
-    { x: 0.46, y: 0.33 },
-    { x: 0.16, y: 0.42 },
-    { x: 0.82, y: 0.47 },
-    { x: 0.52, y: 0.56 },
-    { x: 0.30, y: 0.65 },
-    { x: 0.72, y: 0.72 },
-    { x: 0.45, y: 0.83 }
+    { x: 0.10, y: 0.14 },
+    { x: 0.55, y: 0.20 },
+    { x: 0.88, y: 0.25 },
+    { x: 0.30, y: 0.31 },
+    { x: 0.00, y: 0.38 },
+    { x: 0.65, y: 0.42 },
+    { x: 0.42, y: 0.49 },
+    { x: 1.00, y: 0.53 },
+    { x: 0.20, y: 0.58 },
+    { x: 0.78, y: 0.63 },
+    { x: 0.50, y: 0.69 },
+    { x: 0.08, y: 0.75 },
+    { x: 0.92, y: 0.80 },
+    { x: 0.38, y: 0.86 }
   ];
   var URCHIN_HIT_X = 22;
   var URCHIN_HIT_Y = 22;
@@ -115,6 +122,7 @@
       falseStart: false,
       frozenUntil: 0,
       stunUntil: 0,           // caught on an urchin until this time (0 = free)
+      urchinGraceUntil: 0,    // brief urchin immunity after a stun so you can pull away
       eatenFlash: -9999,      // time of last shark hit (for the red flash)
       finished: false,
       finishTime: 0
@@ -478,10 +486,12 @@
         if (now < pl.stunUntil) {
           pl.vel = 0;                 // caught on an urchin, frozen in place
         } else {
-          if (pl.stunUntil !== 0) {   // stun just ended -> back to the start
+          if (pl.stunUntil !== 0) {   // stun just ended -> nudge to the side and carry on
             pl.stunUntil = 0;
-            pl.pos = 0; pl.vel = 0; pl.lx = 0; pl.lvel = 0;
-            pl.lastHand = null; pl.strokeTimes = [];
+            pl.vel = 0; pl.lvel = 0;
+            pl.lx += (pl.lx <= 0 ? 1 : -1) * 0.42;   // slide clear of the urchin
+            if (pl.lx < -1) pl.lx = -1; if (pl.lx > 1) pl.lx = 1;
+            pl.urchinGraceUntil = now + 900;          // don't instantly re-snag
           }
           // steer across the lane — ease toward the input so turns are gradual,
           // and the swimmer keeps drifting (and moving diagonally) after you let go
@@ -500,8 +510,8 @@
             if (winner === -1) { winner = pl.index; state = "finished"; }
           } else if (pl.pos > 0.02 && (hitsShark(pl, now) || hitsWhale(pl, now))) {
             eatPlayer(pl, now);
-          } else if (pl.pos > 0.02 && hitsUrchin(pl)) {
-            pl.stunUntil = now + URCHIN_STUN_MS;   // 3..2..1 then back to start
+          } else if (pl.pos > 0.02 && now >= pl.urchinGraceUntil && hitsUrchin(pl)) {
+            pl.stunUntil = now + URCHIN_STUN_MS;   // 3s stuck, then carry on from here
             pl.vel = 0;
           }
         }
